@@ -24,21 +24,15 @@ host's own round-robin scheduler is sufficient.
 
 ## Blockers before switchover
 
-1. **The plugin repository has no remote.** `packages/commandcode-bridge/default.nix`
-   in nixos-machines expects `fetchFromGitHub`. The source must be pushed first, then
-   the `rev` and `hash` pinned. GitHub SSH authentication works from this machine.
+1. **The `nixos-machines` tree is dirty with pre-existing work, and the entire
+   CLIProxyAPI deployment is among it.** `git status` shows the deployment files as
+   intent-to-add (` A`) — `hosts/sarmica/cliproxyapi.nix`, `hosts/sarmica/cliproxyapi/*`,
+   and `packages/commandcode-bridge/default.nix` are **not in HEAD**. They exist only as
+   uncommitted work. The switchover must therefore be committed on top of, or together
+   with, that change, and must not capture the unrelated work in the same commit.
 
-2. **The nixos-machines tree has uncommitted pre-existing work.** Per that repo's
-   AGENTS.md, full work should start from a clean tree. The switchover commit must not
-   capture unrelated changes.
-
-3. **`plugins.enabled` drift.** The Nix seed at
-   `hosts/sarmica/cliproxyapi/config.yaml` says `enabled: false`, but the live
-   UI-owned config has plugins enabled. A fresh rebuild would seed plugins disabled
-   and silently load nothing. The seed must be fixed as part of this work.
-
-4. **Sarmica activation is a separately approved operation.** Deployment is not a
-   side effect of a code change.
+2. **Sarmica activation is a separately approved operation.** Deployment is not a
+   side effect of a code change. Gate on `dry-activate`.
 
 ## Switchover sequence
 
@@ -46,16 +40,16 @@ Keep the provider id and the `.so` filename `commandcode-bridge`. That keeps
 `compose.yaml`, `check-compose.py`, and the existing credential file unchanged —
 the guard asserts the exact mount path and volume count.
 
-1. Push the plugin repository; pin `rev` and `hash` in the package derivation.
+1. Apply `packaging/01-package.diff` and `packaging/02-seed-config.diff` from the
+   plugin repository root, on a clean `nixos-machines` tree.
 2. Back up `/var/lib/cliproxyapi/auth` on Sarmica. Preserve
    `commandcode-bridge-57fca5a1eddd.json` (plan goat, priority 6).
-3. Update the Nix seed config to enable plugins and declare the plugin.
-4. `nixos-rebuild dry-activate --flake .#sarmica` and **confirm only
+3. `nixos-rebuild dry-activate --flake .#sarmica` and **confirm only
    `cliproxyapi-compose.service` restarts**. Pangolin, Forgejo and Docker must not.
-5. Do **not** touch `cliproxyapi-secrets.sops.yaml` or
+4. Do **not** touch `cliproxyapi-secrets.sops.yaml` or
    `cliproxyapi-access.sops.yaml`. The documented incident came from SOPS-driven
    restarts, not from the Compose unit.
-6. Activate, then run the read-only smoke checks below.
+5. Activate, then run the read-only smoke checks below.
 
 ## Smoke checks
 
