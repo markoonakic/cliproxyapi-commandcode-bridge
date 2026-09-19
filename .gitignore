@@ -5,8 +5,7 @@
 *.dll
 *.h
 
-# Local test/agent artifacts
-/docs/
+# Local agent scratch artifacts
 /research/
 /analysis/
 /reports/
