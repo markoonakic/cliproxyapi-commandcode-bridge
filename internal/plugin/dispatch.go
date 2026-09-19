@@ -11,6 +11,7 @@ import (
 
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/abi"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/auth"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/executor"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/host"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/management"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/model"
@@ -22,6 +23,7 @@ type runtime struct {
 	quota      *quota.Provider
 	auth       *auth.Provider
 	models     *model.Provider
+	executor   *executor.Provider
 	management *management.Provider
 }
 
@@ -31,6 +33,7 @@ func newRuntime() *runtime {
 		quota:      quotaProvider,
 		auth:       auth.NewProvider(),
 		models:     model.NewProvider(),
+		executor:   executor.NewProvider(),
 		management: management.NewProvider(quotaProvider),
 	}
 }
@@ -44,6 +47,7 @@ func Reset() {
 
 // Shutdown releases runtime resources and prevents late host calls.
 func Shutdown() {
+	state.executor.Shutdown()
 	host.Clear()
 }
 
@@ -124,6 +128,38 @@ func Dispatch(method string, raw []byte, version, commit string) ([]byte, error)
 			return abi.Fail(err), nil
 		}
 		return respond(state.models.ModelsForAuth(host.WithCallbackID(context.Background(), callbackID), req))
+
+	// Executor capability.
+	case abi.MethodExecutorIdentifier:
+		return abi.OK(map[string]string{"identifier": state.executor.Identifier()})
+	case abi.MethodExecutorExecute:
+		req, callbackID, err := decodeWithCallback[pluginapi.ExecutorRequest](raw)
+		if err != nil {
+			return abi.Fail(err), nil
+		}
+		return respond(state.executor.Execute(host.WithCallbackID(context.Background(), callbackID), req))
+	case abi.MethodExecutorExecuteStream:
+		req, envelope, err := decodeExecutorStream(raw)
+		if err != nil {
+			return abi.Fail(err), nil
+		}
+		ctx := host.WithCallbackID(host.WithStreamID(context.Background(), envelope.StreamID), envelope.HostCallbackID)
+		return respond(state.executor.ExecuteStream(ctx, req))
+	case abi.MethodExecutorCountTokens:
+		req, callbackID, err := decodeWithCallback[pluginapi.ExecutorRequest](raw)
+		if err != nil {
+			return abi.Fail(err), nil
+		}
+		if _, errTokens := state.executor.CountTokens(host.WithCallbackID(context.Background(), callbackID), req); errTokens != nil {
+			return abi.Fail(abi.NewError("not_supported", errTokens.Error(), 501)), nil
+		}
+		return abi.OK(pluginapi.ExecutorResponse{})
+	case abi.MethodExecutorHTTPRequest:
+		req, callbackID, err := decodeWithCallback[pluginapi.ExecutorHTTPRequest](raw)
+		if err != nil {
+			return abi.Fail(err), nil
+		}
+		return respond(state.executor.HttpRequest(host.WithCallbackID(context.Background(), callbackID), req))
 
 	// Management capability.
 	case abi.MethodManagementRegister:
@@ -218,6 +254,27 @@ func decodeWithCallback[T any](raw []byte) (T, string, error) {
 		_ = json.Unmarshal(raw, &envelope)
 	}
 	return out, envelope.HostCallbackID, nil
+}
+
+// executorStreamEnvelope carries the host-owned stream id and callback id that
+// accompany an executor stream request.
+type executorStreamEnvelope struct {
+	StreamID       string `json:"stream_id,omitempty"`
+	HostCallbackID string `json:"host_callback_id,omitempty"`
+}
+
+// decodeExecutorStream decodes an executor stream request together with its
+// stream and callback ids.
+func decodeExecutorStream(raw []byte) (pluginapi.ExecutorRequest, executorStreamEnvelope, error) {
+	req, err := decode[pluginapi.ExecutorRequest](raw)
+	if err != nil {
+		return pluginapi.ExecutorRequest{}, executorStreamEnvelope{}, err
+	}
+	var envelope executorStreamEnvelope
+	if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &envelope)
+	}
+	return req, envelope, nil
 }
 
 func decode[T any](raw []byte) (T, error) {

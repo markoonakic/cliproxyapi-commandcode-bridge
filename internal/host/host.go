@@ -22,7 +22,10 @@ type Callback struct {
 	HostCallbackID string `json:"host_callback_id,omitempty"`
 }
 
-type callbackKey struct{}
+type (
+	callbackKey struct{}
+	streamKey   struct{}
+)
 
 var (
 	active Caller
@@ -54,6 +57,24 @@ func WithCallbackID(ctx context.Context, id string) context.Context {
 		return ctx
 	}
 	return context.WithValue(ctx, callbackKey{}, id)
+}
+
+// WithStreamID returns a context carrying the host-owned stream id used for
+// asynchronous executor streaming.
+func WithStreamID(ctx context.Context, id string) context.Context {
+	if id == "" {
+		return ctx
+	}
+	return context.WithValue(ctx, streamKey{}, id)
+}
+
+// StreamIDFrom returns the host stream id stored on the context, if any.
+func StreamIDFrom(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	id, _ := ctx.Value(streamKey{}).(string)
+	return id
 }
 
 // CallbackFrom returns the host callback id stored on the context, if any.

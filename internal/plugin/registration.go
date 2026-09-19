@@ -33,6 +33,11 @@ func registration(version, _ string) ([]byte, error) {
 			"auth_provider": true,
 			// Model catalogue, with human-readable display names.
 			"model_provider": true,
+			// Inference: OpenAI chat-completions translated to Command Code.
+			"executor":                true,
+			"executor_model_scope":    "oauth",
+			"executor_input_formats":  []string{"chat-completions"},
+			"executor_output_formats": []string{"chat-completions"},
 			// Enrollment and quota dashboard under /v0/resource/plugins/.
 			"management_api": true,
 		},
