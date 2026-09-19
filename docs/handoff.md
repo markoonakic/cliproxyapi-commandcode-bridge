@@ -1,6 +1,6 @@
 # Handoff: switchover procedure
 
-Status: plugin source complete (Phases 1–2, plus packaging). Not yet deployed.
+Status: plugin source complete (phases 1–3, plus packaging). Not yet deployed.
 
 ## What is done
 
@@ -13,40 +13,34 @@ Status: plugin source complete (Phases 1–2, plus packaging). Not yet deployed.
 | `AuthProvider` | Implemented; enrollment boundary documented |
 | `ModelProvider` | Implemented; fixes both community-plugin defects |
 | `ManagementAPI` | Implemented; dashboard + 2 routes |
+| `Executor` | Implemented; serves inference via `/alpha/generate` |
 | Nix derivation | Builds; the resulting `.so` loads and registers |
 
-Not done, by design: `Executor`, `Scheduler`, and the live smoke test. The plugin
-currently declares four capabilities; it does **not** yet serve inference. That means
-**replacing the community plugin today would break Command Code inference.**
+Not done, by design: `Scheduler`, and the live smoke test. The plugin declares five
+capabilities and now serves inference, so it can replace the community plugin.
+
+`Scheduler` is only needed for multi-account routing. With one enrolled account the
+host's own round-robin scheduler is sufficient.
 
 ## Blockers before switchover
 
-1. **The plugin cannot serve inference yet.** It declares `auth_provider`,
-   `model_provider`, `quota_provider`, and `management_api`. It does not declare
-   `executor`. The community plugin currently serves all Command Code model traffic
-   through `/v1/chat/completions`. Swapping the `.so` would leave requests unserved.
-
-   Either implement `Executor` first, or run the two plugins side by side under
-   different provider ids. The latter needs a deployment change, because the current
-   setup mounts one specific filename at a fixed path.
-
-2. **The plugin repository has no remote.** `packages/commandcode-bridge/default.nix`
+1. **The plugin repository has no remote.** `packages/commandcode-bridge/default.nix`
    in nixos-machines expects `fetchFromGitHub`. The source must be pushed first, then
    the `rev` and `hash` pinned. GitHub SSH authentication works from this machine.
 
-3. **The nixos-machines tree has uncommitted pre-existing work.** Per that repo's
+2. **The nixos-machines tree has uncommitted pre-existing work.** Per that repo's
    AGENTS.md, full work should start from a clean tree. The switchover commit must not
    capture unrelated changes.
 
-4. **`plugins.enabled` drift.** The Nix seed at
+3. **`plugins.enabled` drift.** The Nix seed at
    `hosts/sarmica/cliproxyapi/config.yaml` says `enabled: false`, but the live
    UI-owned config has plugins enabled. A fresh rebuild would seed plugins disabled
    and silently load nothing. The seed must be fixed as part of this work.
 
-5. **Sarmica activation is a separately approved operation.** Deployment is not a
+4. **Sarmica activation is a separately approved operation.** Deployment is not a
    side effect of a code change.
 
-## Switchover sequence (once Executor exists)
+## Switchover sequence
 
 Keep the provider id and the `.so` filename `commandcode-bridge`. That keeps
 `compose.yaml`, `check-compose.py`, and the existing credential file unchanged —
