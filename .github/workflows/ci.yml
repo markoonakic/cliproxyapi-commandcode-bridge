@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: cachix/install-nix-action@v31.10.6
+
+      - name: Check formatting
+        run: nix fmt --no-update-lock-file -- --ci .
+
+      - name: Go vet
+        run: nix develop --no-update-lock-file --command go vet ./...
+
+      - name: Go test
+        run: nix develop --no-update-lock-file --command go test ./...
+
+      # Builds the shared library, which is the real deliverable. This also
+      # proves the vendor hash in nix/default.nix is still correct.
+      - name: Build plugin
+        run: nix build --no-update-lock-file .#commandcode-bridge

@@ -86,3 +86,27 @@ is never removed by a plugin change.
 Quota was verified live only on the `goat` plan. Other tiers may return a different
 `windowLimits` shape; an absent `cap` fails closed and reports "unavailable" rather
 than a wrong percentage.
+
+## Verified baseline (2026-09-19, pre-switchover)
+
+Recorded so the smoke checks have a before/after reference:
+
+| Check | Current value | Expected after |
+| --- | --- | --- |
+| `/v0/management/plugins` → `supports_quota` | `false` | `true` |
+| `/v0/management/quota/providers` | `{"providers":[]}` | `{"providers":["commandcode-bridge"]}` |
+| `POST /v0/management/quota/fetch` | `501 no quota provider available for credential` | `200` with plan, groups and metrics |
+| `/v0/resource/plugins/commandcode-bridge/accounts` | `200` (community page) | `200` (our page) |
+
+## Ready-made packaging
+
+`packaging/` holds the prepared, unapplied deployment artifacts:
+
+- `commandcode-bridge-package.nix` — drop-in replacement derivation. Its exact shape was
+  built and verified locally against a local source tree.
+- `seed-config.patch.md` — the `plugins.enabled` drift fix.
+- `README.md` — apply order.
+
+The `hash` in the package file is content-addressed by the source tree; the value was
+derived from the tree and is expected to work for `fetchFromGitHub` after pushing. Nix
+prints the correct value if it differs.
