@@ -57,6 +57,7 @@ type whoamiResponse struct {
 
 // Subscription describes the plan and billing period.
 type Subscription struct {
+	ID                 string `json:"id"`
 	PlanID             string `json:"planId"`
 	Status             string `json:"status"`
 	CurrentPeriodStart string `json:"currentPeriodStart"`
@@ -230,6 +231,30 @@ func (c *Client) Usage(ctx context.Context, apiKey string) (UsageSummary, error)
 		return UsageSummary{}, err
 	}
 	return out, nil
+}
+
+// CatalogModel is one entry of the provider model catalogue.
+type CatalogModel struct {
+	ID            string `json:"id"`
+	Object        string `json:"object"`
+	Created       int64  `json:"created"`
+	OwnedBy       string `json:"owned_by"`
+	Name          string `json:"name"`
+	ContextLength int64  `json:"context_length"`
+}
+
+type catalogResponse struct {
+	Object string         `json:"object"`
+	Data   []CatalogModel `json:"data"`
+}
+
+// Catalog fetches the documented provider model catalogue.
+func (c *Client) Catalog(ctx context.Context, apiKey string) ([]CatalogModel, error) {
+	var out catalogResponse
+	if _, err := c.get(ctx, apiKey, pathModels, &out); err != nil {
+		return nil, err
+	}
+	return out.Data, nil
 }
 
 // RemainingFraction converts a window into a clamped remaining fraction. It

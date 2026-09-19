@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Command Code Bridge</title>
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --line: #2b303b; --fg: #e6e8ec;
+    --muted: #9aa3b2; --accent: #6d5dfb; --ok: #3fb950; --warn: #d29922; --bad: #f85149;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  input[type=text] {
+    flex: 1 1 320px; min-width: 220px; padding: 8px 10px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+  }
+  button {
+    padding: 8px 12px; border-radius: 6px; border: 1px solid var(--line);
+    background: var(--panel); color: var(--fg); cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .note {
+    background: #1a1f2b; border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    padding: 10px 12px; border-radius: 6px; color: var(--muted); margin-bottom: 16px;
+  }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .ident { color: var(--muted); font-size: 12px; margin-bottom: 12px; word-break: break-all; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; margin-top: 12px; }
+  .row .label { color: var(--muted); font-size: 12px; }
+  .row .value { font-variant-numeric: tabular-nums; }
+  .bar { height: 8px; border-radius: 999px; background: #2b303b; overflow: hidden; margin-top: 6px; }
+  .bar > span { display: block; height: 100%; background: var(--ok); }
+  .bar.warn > span { background: var(--warn); }
+  .bar.bad > span { background: var(--bad); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px;
+    border: 1px solid var(--line); color: var(--muted); text-transform: uppercase;
+  }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.bad { color: var(--bad); border-color: var(--bad); }
+  .metric { display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; }
+  .metric span:last-child { font-variant-numeric: tabular-nums; }
+  .err { color: var(--bad); font-size: 12px; margin-top: 10px; }
+  .empty { color: var(--muted); padding: 32px; text-align: center; border: 1px dashed var(--line); border-radius: 10px; }
+  code { background: #2b303b; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+  <h1>Command Code Bridge</h1>
+  <p class="sub">Accounts, quota windows and credit balances for Command Code.</p>
+
+  <div class="note">
+    Credentials are owned by CLIProxyAPI and stored in its <code>auth-dir</code>. This page
+    reads quota through the host, so no key ever reaches the browser. Enrollment validates a
+    <span class="mono">user_</span> API key and then persists it through the host auth callback.
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="account" placeholder="Account file name or auth index, e.g. commandcode-bridge-abc123.json" autocomplete="off">
+    <button class="primary" id="load">Load quota</button>
+  </div>
+
+  <div id="out"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var BASE = "/v0/management/plugins/commandcode-bridge";
+
+  function el(tag, attrs, children) {
+    var node = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (key) {
+      if (key === "text") { node.textContent = attrs[key]; }
+      else if (key === "class") { node.className = attrs[key]; }
+      else { node.setAttribute(key, attrs[key]); }
+    });
+    (children || []).forEach(function (child) { node.appendChild(child); });
+    return node;
+  }
+
+  function pct(fraction) {
+    if (typeof fraction !== "number" || !isFinite(fraction)) { return "unavailable"; }
+    return Math.round(fraction * 100) + "% remaining";
+  }
+
+  function barClass(fraction) {
+    if (typeof fraction !== "number" || !isFinite(fraction)) { return "bar"; }
+    if (fraction <= 0.1) { return "bar bad"; }
+    if (fraction <= 0.3) { return "bar warn"; }
+    return "bar";
+  }
+
+  function resetText(iso) {
+    if (!iso) { return "no reset time reported"; }
+    var when = new Date(iso);
+    if (isNaN(when.getTime())) { return iso; }
+    var mins = Math.round((when.getTime() - Date.now()) / 60000);
+    if (mins <= 0) { return "resets now"; }
+    if (mins < 60) { return "resets in " + mins + "m"; }
+    var hours = Math.floor(mins / 60);
+    var rem = mins % 60;
+    if (hours < 48) { return "resets in " + hours + "h " + rem + "m"; }
+    return "resets in " + Math.round(hours / 24) + "d";
+  }
+
+  function renderError(message) {
+    var out = document.getElementById("out");
+    out.innerHTML = "";
+    out.appendChild(el("div", { class: "empty", text: message }));
+  }
+
+  function renderQuota(authIndex, data) {
+    var out = document.getElementById("out");
+    out.innerHTML = "";
+
+    var card = el("div", { class: "card" });
+    var plan = (data.subscription && data.subscription.plan) || "unknown";
+    card.appendChild(el("h2", { text: "Account " + plan }));
+    card.appendChild(el("div", { class: "ident", text: "auth_index " + authIndex }));
+    card.appendChild(el("span", { class: "pill ok", text: "quota available" }));
+
+    var groups = data.groups || [];
+    var rendered = 0;
+    groups.forEach(function (group) {
+      (group.buckets || []).forEach(function (bucket) {
+        rendered++;
+        var label = (bucket.window || "window");
+        card.appendChild(el("div", { class: "row" }, [
+          el("span", { class: "label", text: label }),
+          el("span", { class: "value", text: pct(bucket.remainingFraction) })
+        ]));
+        var bar = el("div", { class: barClass(bucket.remainingFraction) });
+        var fill = el("span");
+        var width = (typeof bucket.remainingFraction === "number" && isFinite(bucket.remainingFraction))
+          ? Math.max(0, Math.min(1, bucket.remainingFraction)) * 100 : 0;
+        fill.style.width = width + "%";
+        bar.appendChild(fill);
+        card.appendChild(bar);
+        card.appendChild(el("div", { class: "metric" }, [
+          el("span", { text: bucket.description || "" }),
+          el("span", { text: resetText(bucket.resetTime) })
+        ]));
+      });
+    });
+
+    (data.summary || []).forEach(function (metric) {
+      var value = metric.value;
+      if (metric.format === "currency") {
+        value = (metric.currency ? metric.currency + " " : "") + Number(metric.value).toFixed(2);
+      }
+      card.appendChild(el("div", { class: "metric" }, [
+        el("span", { text: metric.label || metric.key }),
+        el("span", { text: String(value) })
+      ]));
+    });
+
+    if (rendered === 0 && (data.summary || []).length === 0) {
+      card.appendChild(el("div", { class: "err", text: "Command Code reported no usable quota data." }));
+    }
+    out.appendChild(card);
+  }
+
+  function load() {
+    var input = document.getElementById("account");
+    var value = (input.value || "").trim();
+    if (!value) {
+      renderError("Enter an account file name or auth index.");
+      return;
+    }
+    var button = document.getElementById("load");
+    button.disabled = true;
+    renderError("Loading quota...");
+
+    fetch(BASE + "/quota?auth_index=" + encodeURIComponent(value), { headers: { Accept: "application/json" } })
+      .then(function (response) {
+        return response.text().then(function (text) { return { ok: response.ok, text: text }; });
+      })
+      .then(function (result) {
+        if (!result.ok) {
+          var message = result.text;
+          try { message = JSON.parse(result.text).error || message; } catch (e) {}
+          renderError(message);
+          return;
+        }
+        renderQuota(value, JSON.parse(result.text));
+      })
+      .catch(function (err) {
+        renderError("Request failed: " + err);
+      })
+      .then(function () { button.disabled = false; });
+  }
+
+  document.getElementById("load").addEventListener("click", load);
+  document.getElementById("account").addEventListener("keydown", function (event) {
+    if (event.key === "Enter") { load(); }
+  });
+})();
+</script>
+</body>
+</html>
