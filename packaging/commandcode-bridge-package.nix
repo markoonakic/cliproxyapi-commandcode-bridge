@@ -24,7 +24,7 @@ buildGoModule (finalAttrs: {
   src = fetchFromGitHub {
     owner = "markoonakic";
     repo = "cliproxyapi-commandcode-bridge";
-    rev = "REPLACE_WITH_PUSHED_COMMIT_SHA";
+    rev = "e5736abb69a692fb88a6b884eeaefffc4983b4f7";
     hash = "sha256-arAF0Xk5QO+dtnhCmeoWu8TrQK8gqNK/nzQYhiSEBr4=";
   };
 
