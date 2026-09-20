@@ -76,17 +76,22 @@ func (p *Provider) RegisterManagement(_ context.Context, _ pluginapi.ManagementR
 }
 
 // HandleManagement serves one plugin-owned route.
+//
+// The host passes the full request path, for example
+// "/v0/resource/plugins/command-code/accounts", but a route is declared relative
+// ("/accounts"). Both spellings are therefore matched, which is what the
+// reference plugin does; matching only the declared path makes every page 404.
 func (p *Provider) HandleManagement(ctx context.Context, req pluginapi.ManagementRequest) (pluginapi.ManagementResponse, error) {
-	path := strings.TrimSuffix(req.Path, "/")
+	path := strings.TrimRight(strings.TrimSpace(req.Path), "/")
 	if path == "" {
 		path = "/"
 	}
 	switch {
-	case req.Method == http.MethodGet && path == pathAccounts:
+	case req.Method == http.MethodGet && (path == pathAccounts || path == resourcePath(pathAccounts)):
 		return htmlResponse(accountsPage), nil
-	case req.Method == http.MethodGet && path == pathQuota:
+	case req.Method == http.MethodGet && (path == pathQuota || path == managementPath(pathQuota)):
 		return p.handleQuota(ctx, req)
-	case req.Method == http.MethodPost && path == pathValidate:
+	case req.Method == http.MethodPost && (path == pathValidate || path == managementPath(pathValidate)):
 		return p.handleValidate(ctx, req)
 	default:
 		return jsonError(http.StatusNotFound, "unknown route"), nil
@@ -145,6 +150,19 @@ func (p *Provider) handleValidate(ctx context.Context, req pluginapi.ManagementR
 		result["default_priority"] = priority
 	}
 	return jsonOK(result), nil
+}
+
+// resourcePath returns the full path the host uses for a resource route.
+func resourcePath(relative string) string {
+	return "/v0/resource/plugins/" + ProviderID + relative
+}
+
+// managementPath returns the full path the host uses for a management route.
+//
+// Management routes are mounted directly under /v0/management; unlike resource
+// routes they are not namespaced by plugin id.
+func managementPath(relative string) string {
+	return "/v0/management" + relative
 }
 
 func firstQuery(values url.Values, keys ...string) string {
