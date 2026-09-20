@@ -13,13 +13,13 @@
 }:
 buildGoModule (finalAttrs: {
   pname = "cliproxyapi-command-code";
-  version = "1.2.2";
+  version = "1.2.3";
 
   src = fetchFromGitHub {
     owner = "markoonakic";
     repo = "cliproxyapi-commandcode-bridge";
-    rev = "4bc9624fa8386924542adbaafc0c36c3eac4f846";
-    hash = "sha256-KRcGFqzOcVlk2BOf0tW2ibuCb7tLP2gfAQEyK65aCkg=";
+    rev = "cebfc631968c50f8c39d448655f84d96b397ae55";
+    hash = "sha256-XtMmeeW5q/Yob/zUPU6rwfgkdE08WcMSRbWw9R1ARpc=";
   };
 
   # Only the CLIProxyAPI SDK packages are imported, so the closure is small.

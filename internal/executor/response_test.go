@@ -267,3 +267,47 @@ func TestNewIDIsUUID(t *testing.T) {
 		seen[id] = true
 	}
 }
+
+// TestEmittedPayloadStripsDataPrefix guards the SSE wire format.
+//
+// Frames are built with a "data: " prefix, but the host re-adds that prefix
+// when it writes the event. Emitting it here produced "data: data: {...}" and
+// broke SSE parsing on the client.
+func TestEmittedPayloadStripsDataPrefix(t *testing.T) {
+	stripped := func(frame []byte) (string, bool) {
+		payload := strings.TrimSpace(string(frame))
+		if payload == "[DONE]" {
+			return "", false
+		}
+		if after, ok := strings.CutPrefix(payload, "data:"); ok {
+			payload = strings.TrimSpace(after)
+			if payload == "" || payload == "[DONE]" {
+				return "", false
+			}
+		}
+		return payload, len(payload) > 0
+	}
+
+	state := newResponseState("id", 0, "m", false)
+	frames, err := state.Feed([]byte("data: {\"type\":\"text-delta\",\"text\":\"hi\"}\n"))
+	if err != nil {
+		t.Fatalf("Feed failed: %v", err)
+	}
+	var emitted []string
+	for _, frame := range frames {
+		if payload, ok := stripped(frame); ok {
+			emitted = append(emitted, payload)
+		}
+	}
+	if len(emitted) == 0 {
+		t.Fatal("expected at least one emitted frame")
+	}
+	for _, payload := range emitted {
+		if strings.HasPrefix(payload, "data:") {
+			t.Errorf("emitted payload still has a data: prefix: %q", payload)
+		}
+		if !strings.HasPrefix(payload, "{") {
+			t.Errorf("emitted payload is not JSON: %q", payload)
+		}
+	}
+}

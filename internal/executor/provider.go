@@ -326,15 +326,25 @@ func emitFrames(streamID string, frames [][]byte) error {
 	return nil
 }
 
-// emitDownstream forwards one OpenAI SSE frame. The closing marker is dropped
-// because the host stream close signals the end.
+// emitDownstream forwards one OpenAI SSE frame to the host.
+//
+// The "data: " prefix is stripped: the host re-adds it when it writes the
+// event, so sending it here produced a doubled "data: data:" line that breaks
+// SSE parsing on the client. The closing marker is dropped because the host
+// stream close signals the end.
 func emitDownstream(streamID string, payload []byte) error {
 	payload = bytesTrimSpace(payload)
 	if len(payload) == 0 {
 		return nil
 	}
-	if string(payload) == "data: [DONE]" || string(payload) == "[DONE]" {
+	if string(payload) == "[DONE]" {
 		return nil
+	}
+	if after, ok := strings.CutPrefix(string(payload), "data:"); ok {
+		payload = bytesTrimSpace([]byte(after))
+		if len(payload) == 0 || string(payload) == "[DONE]" {
+			return nil
+		}
 	}
 	return host.Call(pluginabi.MethodHostStreamEmit, map[string]any{
 		"stream_id": streamID,
