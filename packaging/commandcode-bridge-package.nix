@@ -17,15 +17,15 @@
 }:
 buildGoModule (finalAttrs: {
   pname = "commandcode-bridge";
-  version = "1.0.0";
+  version = "1.1.0";
 
   # Clean-room rewrite replacing the community plugin. Pin the revision; do not
   # follow a branch.
   src = fetchFromGitHub {
     owner = "markoonakic";
     repo = "cliproxyapi-commandcode-bridge";
-    rev = "e5736abb69a692fb88a6b884eeaefffc4983b4f7";
-    hash = "sha256-arAF0Xk5QO+dtnhCmeoWu8TrQK8gqNK/nzQYhiSEBr4=";
+    rev = "debef6b2407a348e3d4f87cd3d5625e4ce139c69";
+    hash = "sha256-7JVRZ5HbKQYUmlTOCDiyDEO4cxhzg2r4jxJm6SzL1HA=";
   };
 
   # Only the CLIProxyAPI SDK packages are imported, so the vendor closure is

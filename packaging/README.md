@@ -11,8 +11,7 @@ No change has been made to `nixos-machines` or to Sarmica.
 | `02-seed-config.diff` | Fixes the `plugins.enabled` seed drift |
 | `commandcode-bridge-package.nix` | The full target file, for reference |
 
-Both diffs were verified to **apply cleanly** to the current `nixos-machines` worktree, and
-the patched package was **built successfully** from GitHub.
+Both diffs apply cleanly to the current `nixos-machines` worktree.
 
 ## Apply
 
@@ -34,16 +33,26 @@ Docker creates the parent directory when it bind-mounts the file, so
 
 ## Pinned values
 
-- `rev = "e5736abb69a692fb88a6b884eeaefffc4983b4f7"` (tag `v1.0.0`)
-- `hash = "sha256-arAF0Xk5QO+dtnhCmeoWu8TrQK8gqNK/nzQYhiSEBr4="` — verified against
-  `fetchFromGitHub` on the pushed repository
-- `vendorHash = "sha256-vSLDY8mpkqVv5NNF9MA1EsBeZtbyAz/WTKHT4g9aRgY="` — recompute only if
-  the SDK version in `go.mod` changes
+- `version = "1.1.0"`
+- `rev = "debef6b2407a348e3d4f87cd3d5625e4ce139c69"` (tag `v1.1.0`)
+- `hash = "sha256-7JVRZ5HbKQYUmlTOCDiyDEO4cxhzg2r4jxJm6SzL1HA="` — verified against a real
+  archive download with substitution disabled, not a local cache hit
+- `vendorHash = "sha256-vSLDY8mpkqVv5NNF9MA1EsBeZtbyAz/WTKHT4g9aRgY="` — unchanged, because
+  the new package adds no third-party dependency. Recompute only if the SDK version in
+  `go.mod` changes.
 
-## Safety
+## The repository is public
 
-- `02-seed-config.diff` edits a **config template**, not a SOPS secret file. It does not
-  touch the SOPS restart behaviour behind the documented activation incident.
-- `config.yaml` is already in `restartTriggers`, so only `cliproxyapi-compose.service`
-  restarts.
-- Gate on `nixos-rebuild dry-activate` and confirm ONLY the Compose unit is scheduled.
+`fetchFromGitHub` on a private repository fails without `access-tokens` configured, and
+this deployment has none. Every other `fetchFromGitHub` in `nixos-machines` points at a
+public repository, and the one private source (`pi-zza`) is consumed from a local clone
+instead.
+
+The plugin repository is therefore public, so the token-free fetch path works with the
+existing convention. It contains no secrets: the credential scan is clean.
+
+## Verified
+
+The patched derivation was built with `--option substitute false`, so nothing came from a
+local cache, and produced a `.so` exporting all four ABI symbols and declaring all six
+capabilities, confirmed by loading it the same way the host does.
