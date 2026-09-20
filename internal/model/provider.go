@@ -106,15 +106,22 @@ func (p *Provider) ModelsForAuth(ctx context.Context, req pluginapi.AuthModelReq
 	if len(cred.Models) == 0 {
 		return pluginapi.ModelResponse{Provider: auth.ProviderID, Models: modelsFromContexts(contexts)}, nil
 	}
+	return pluginapi.ModelResponse{Provider: auth.ProviderID, Models: modelsForCredential(cred, contexts)}, nil
+}
 
+// modelsForCredential publishes the models selected on one credential.
+//
+// An alias becomes the client-visible id, and the upstream model name is kept
+// in Name so the executor still addresses the right model. This is what lets a
+// second Command Code plugin advertise non-colliding model ids, which
+// side-by-side testing depends on.
+func modelsForCredential(cred auth.Credential, contexts map[string]int64) []pluginapi.ModelInfo {
 	models := make([]pluginapi.ModelInfo, 0, len(cred.Models))
 	for _, selected := range cred.Models {
 		name := strings.TrimSpace(selected.Name)
 		if name == "" {
 			continue
 		}
-		// An alias becomes the client-visible id; the upstream id is preserved
-		// in Name so the executor still addresses the right model.
 		models = append(models, pluginapi.ModelInfo{
 			ID:                         auth.ClientModelID(selected),
 			Name:                       name,
@@ -126,7 +133,7 @@ func (p *Provider) ModelsForAuth(ctx context.Context, req pluginapi.AuthModelReq
 		})
 	}
 	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
-	return pluginapi.ModelResponse{Provider: auth.ProviderID, Models: models}, nil
+	return models
 }
 
 // DisplayNameFor returns a human-readable name for a model id.

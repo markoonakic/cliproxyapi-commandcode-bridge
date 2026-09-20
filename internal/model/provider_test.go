@@ -83,10 +83,7 @@ func TestModelsForAuthPublishesAliasAsID(t *testing.T) {
 		auth.CredentialMod{Name: "deepseek/deepseek-v4.1-flash"},
 		auth.CredentialMod{Name: "z-ai/glm-5.3-flash", Alias: "cc/glm-5.3-flash"},
 	)
-	models, err := modelsForCredential(cred, nil)
-	if err != nil {
-		t.Fatalf("modelsForCredential failed: %v", err)
-	}
+	models := modelsForCredential(cred, nil)
 	if len(models) != 2 {
 		t.Fatalf("models = %d, want 2", len(models))
 	}
@@ -127,10 +124,7 @@ func TestModelsForAuthWithoutAliasesMatchesUpstreamIDs(t *testing.T) {
 		auth.CredentialMod{Name: "z-ai/glm-5.3-flash"},
 		auth.CredentialMod{Name: "meta/muse-spark-1.3-contributor"},
 	)
-	models, err := modelsForCredential(cred, nil)
-	if err != nil {
-		t.Fatalf("modelsForCredential failed: %v", err)
-	}
+	models := modelsForCredential(cred, nil)
 	want := []string{
 		"deepseek/deepseek-v4.1-flash",
 		"meta/muse-spark-1.3-contributor",
@@ -153,10 +147,7 @@ func TestModelsForAuthAliasRoundTripsThroughExecutor(t *testing.T) {
 	cred := credentialWith(
 		auth.CredentialMod{Name: "z-ai/glm-5.3-flash", Alias: "cc/glm-5.3-flash"},
 	)
-	models, err := modelsForCredential(cred, nil)
-	if err != nil {
-		t.Fatalf("modelsForCredential failed: %v", err)
-	}
+	models := modelsForCredential(cred, nil)
 	if len(models) != 1 {
 		t.Fatalf("models = %d, want 1", len(models))
 	}
