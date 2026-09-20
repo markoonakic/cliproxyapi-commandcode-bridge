@@ -12,6 +12,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/host"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
 // Command Code endpoints. The alpha routes are undocumented; their existence
@@ -25,7 +26,7 @@ const (
 	pathCredits    = "/alpha/billing/credits"
 	pathUsage      = "/alpha/usage/summary"
 	pathModels     = "/provider/v1/models"
-	userAgent      = "cliproxyapi-commandcode-bridge"
+	userAgent      = identity.UserAgent
 )
 
 // Client talks to Command Code through the host HTTP callback so the host's

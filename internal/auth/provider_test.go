@@ -3,6 +3,8 @@ package auth
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
 // deployedCredential is the credential file shape already present on the host.
@@ -120,7 +122,7 @@ func TestFingerprintIsStableAndNotTheKey(t *testing.T) {
 	if Fingerprint(key+"x") == fp {
 		t.Error("different keys must not collide here")
 	}
-	if fileName := FileName(key); fileName != "commandcode-bridge-"+fp+".json" {
+	if fileName := FileName(key); fileName != identity.FileNamePrefix+"-"+fp+".json" {
 		t.Errorf("FileName = %q", fileName)
 	}
 }

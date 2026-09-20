@@ -12,14 +12,15 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
+
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
-// ProviderID is the stable provider key. It must match the auth provider key
-// and the compiled .so name so the existing credential keeps loading.
-const ProviderID = "commandcode-bridge"
+// ProviderID is the stable provider key, shared with every other capability.
+const ProviderID = identity.ProviderKey
 
 // DisplayName is the user-facing label for the Management API.
-const DisplayName = "Command Code"
+const DisplayName = identity.DisplayName
 
 // credential mirrors the persisted Command Code auth file. The identity fields
 // are optional additions, so the pre-existing seven-key file still parses.

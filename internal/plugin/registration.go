@@ -4,6 +4,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/abi"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
 // registration is the capability declaration returned at plugin.register and
@@ -20,10 +21,10 @@ func registration(version, _ string) ([]byte, error) {
 	}{
 		SchemaVersion: abi.SchemaVersion,
 		Metadata: pluginapi.Metadata{
-			Name:             "Command Code Bridge",
+			Name:             identity.Name,
 			Version:          version,
-			Author:           "CommandCode Bridge contributors",
-			GitHubRepository: "https://github.com/markoonakic/cliproxyapi-commandcode-bridge",
+			Author:           identity.Author,
+			GitHubRepository: identity.Repository,
 			ConfigFields:     []pluginapi.ConfigField{},
 		},
 		Capabilities: map[string]any{

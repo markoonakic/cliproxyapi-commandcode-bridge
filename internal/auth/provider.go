@@ -19,12 +19,12 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/host"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/quota"
 )
 
-// ProviderID is the stable provider key. It matches the compiled .so name and
-// the provider key of the credential file already deployed on the host.
-const ProviderID = "commandcode-bridge"
+// ProviderID is the stable provider key, shared with every other capability.
+const ProviderID = identity.ProviderKey
 
 // Credential is the persisted auth file shape.
 //
@@ -87,7 +87,7 @@ func Fingerprint(apiKey string) string {
 
 // FileName returns the auth file name for an API key.
 func FileName(apiKey string) string {
-	return ProviderID + "-" + Fingerprint(apiKey) + ".json"
+	return identity.FileNamePrefix + "-" + Fingerprint(apiKey) + ".json"
 }
 
 // Validate checks the key shape. Command Code keys begin with "user_" and must

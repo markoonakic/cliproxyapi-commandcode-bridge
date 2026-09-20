@@ -19,11 +19,13 @@ import (
 	"sync"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
+
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
 // ProviderID is the stable provider key. Candidates for any other provider are
 // ignored so the built-in scheduler continues to serve them.
-const ProviderID = "commandcode-bridge"
+const ProviderID = identity.ProviderKey
 
 // Availability reports whether a credential's cached quota blocks selection.
 type Availability interface {

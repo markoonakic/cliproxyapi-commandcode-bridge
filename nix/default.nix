@@ -3,7 +3,7 @@
   buildGoModule,
 }:
 buildGoModule (finalAttrs: {
-  pname = "commandcode-bridge";
+  pname = "cliproxyapi-command-code";
   version = "1.1.0";
 
   # Built from the local source tree. The NixOS module passes the repository
@@ -21,14 +21,14 @@ buildGoModule (finalAttrs: {
     runHook preBuild
     go build -mod=vendor -trimpath -buildmode=c-shared \
       -ldflags="-s -w -X main.Version=${finalAttrs.version}" \
-      -o commandcode-bridge.so ./cmd/commandcode-bridge
+      -o command-code.so ./cmd/commandcode-bridge
     runHook postBuild
   '';
 
   installPhase = ''
     runHook preInstall
-    install -Dm444 commandcode-bridge.so "$out/lib/commandcode-bridge.so"
-    install -Dm444 LICENSE "$out/share/licenses/commandcode-bridge/LICENSE"
+    install -Dm444 command-code.so "$out/lib/command-code.so"
+    install -Dm444 LICENSE "$out/share/licenses/command-code/LICENSE"
     runHook postInstall
   '';
 
@@ -36,7 +36,7 @@ buildGoModule (finalAttrs: {
   doCheck = false;
 
   meta = {
-    description = "Native CLIProxyAPI plugin giving Command Code parity with the built-in channels";
+    description = "Native CLIProxyAPI plugin for Command Code, with parity to the built-in channels";
     homepage = "https://github.com/markoonakic/cliproxyapi-commandcode-bridge";
     license = lib.licenses.mit;
     platforms = [ "x86_64-linux" ];

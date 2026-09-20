@@ -11,13 +11,13 @@
     in
     {
       packages = forAllSystems (pkgs: rec {
-        commandcode-bridge = pkgs.callPackage ./nix/default.nix { };
-        default = commandcode-bridge;
+        command-code = pkgs.callPackage ./nix/default.nix { };
+        default = command-code;
       });
 
       checks = forAllSystems (pkgs: {
         # Builds the shared library, which is the real deliverable.
-        build = self.packages.${pkgs.system}.commandcode-bridge;
+        build = self.packages.${pkgs.system}.command-code;
       });
 
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);

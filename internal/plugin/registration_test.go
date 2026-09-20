@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/abi"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/identity"
 )
 
 // decodeResult unwraps a successful RPC envelope and decodes its result.
@@ -68,7 +69,7 @@ func TestQuotaDescribeReportsNoResetSupport(t *testing.T) {
 	}
 	decodeResult(t, raw, &resp)
 
-	if len(resp.SupportedProviders) != 1 || resp.SupportedProviders[0] != "commandcode-bridge" {
+	if len(resp.SupportedProviders) != 1 || resp.SupportedProviders[0] != identity.ProviderKey {
 		t.Errorf("supported_providers = %v", resp.SupportedProviders)
 	}
 	if resp.SupportsReset {
@@ -102,8 +103,8 @@ func TestQuotaIdentifierMatchesProviderKey(t *testing.T) {
 		Identifier string `json:"identifier"`
 	}
 	decodeResult(t, raw, &resp)
-	if resp.Identifier != "commandcode-bridge" {
-		t.Errorf("identifier = %q, want commandcode-bridge", resp.Identifier)
+	if resp.Identifier != identity.ProviderKey {
+		t.Errorf("identifier = %q, want %q", resp.Identifier, identity.ProviderKey)
 	}
 }
 
