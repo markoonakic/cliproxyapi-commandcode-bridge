@@ -5,7 +5,6 @@ package executor
 import (
 	"context"
 	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"strings"
@@ -379,10 +378,16 @@ func (p *Provider) Shutdown() {
 	p.mu.Unlock()
 }
 
+// newID returns a random RFC 4122 version 4 UUID.
+//
+// The format matters: Command Code rejects a bare hex string with HTTP 400, so
+// the version and variant bits are set and the value is grouped 8-4-4-4-12.
 func newID() string {
-	buf := make([]byte, 16)
-	if _, err := rand.Read(buf); err != nil {
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err != nil {
 		return fmt.Sprintf("%d", time.Now().UnixNano())
 	}
-	return hex.EncodeToString(buf)
+	value[6] = value[6]&0x0f | 0x40
+	value[8] = value[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", value[0:4], value[4:6], value[6:8], value[8:10], value[10:16])
 }

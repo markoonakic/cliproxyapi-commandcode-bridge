@@ -2,6 +2,7 @@ package executor
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -247,5 +248,22 @@ func TestNormalizedFinishReason(t *testing.T) {
 		if got := state.normalizedFinishReason(); got != want {
 			t.Errorf("normalizedFinishReason(%q) = %q, want %q", input, got, want)
 		}
+	}
+}
+
+// TestNewIDIsUUID guards the upstream wire format. Command Code rejects a bare
+// hex string with HTTP 400, so the id must be a grouped v4 UUID.
+func TestNewIDIsUUID(t *testing.T) {
+	pattern := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	seen := map[string]bool{}
+	for i := 0; i < 50; i++ {
+		id := newID()
+		if !pattern.MatchString(id) {
+			t.Fatalf("newID() = %q, want an RFC 4122 v4 UUID", id)
+		}
+		if seen[id] {
+			t.Fatalf("newID() repeated %q", id)
+		}
+		seen[id] = true
 	}
 }
