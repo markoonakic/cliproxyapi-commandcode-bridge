@@ -14,13 +14,26 @@ Status: plugin source complete (phases 1–3, plus packaging). Not yet deployed.
 | `ModelProvider` | Implemented; fixes both community-plugin defects |
 | `ManagementAPI` | Implemented; dashboard + 2 routes |
 | `Executor` | Implemented; serves inference via `/alpha/generate` |
+| `Scheduler` | Implemented; quota-aware multi-account routing |
 | Nix derivation | Builds; the resulting `.so` loads and registers |
 
-Not done, by design: `Scheduler`, and the live smoke test. The plugin declares five
-capabilities and now serves inference, so it can replace the community plugin.
+All six capabilities are implemented, so parity with the native channels is complete at
+the capability level.
 
-`Scheduler` is only needed for multi-account routing. With one enrolled account the
-host's own round-robin scheduler is sufficient.
+The only thing not done is the live smoke test: the plugin has never made a real upstream
+call. That is what step 5 of the switchover proves.
+
+### Scheduler behaviour
+
+The host consults a plugin scheduler for **every** provider, so ours decides only for
+Command Code candidates and declines everything else, leaving antigravity and codex on the
+host's built-in selection.
+
+Selection matches the host's built-in semantics: highest ready priority band, then
+round-robin within it, using a successor walk over ID-sorted candidates. On top of that it
+skips an account whose cached quota window is exceeded and has not reset — a signal the
+host cannot know before upstream returns a rate-limit error. The mark expires in memory
+when the reset passes; there is no polling and no background timer.
 
 ## Blockers before switchover
 
