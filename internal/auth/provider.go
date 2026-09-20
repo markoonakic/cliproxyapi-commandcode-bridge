@@ -257,3 +257,43 @@ func ToAuthData(cred Credential, fileName string) pluginapi.AuthData {
 		Attributes:  attributes,
 	}
 }
+
+// ClientModelID returns the id clients use for a selected model: the alias when
+// one is set, otherwise the upstream model name.
+//
+// The host registers this id, so it is the id a client must request. The
+// upstream name is preserved separately so execution still addresses the right
+// model.
+func ClientModelID(selected CredentialMod) string {
+	if alias := strings.TrimSpace(selected.Alias); alias != "" {
+		return alias
+	}
+	return strings.TrimSpace(selected.Name)
+}
+
+// ResolveUpstreamModel maps a client-visible model id back to the upstream
+// model name for a credential.
+//
+// It accepts either an alias or a plain upstream name, because a credential may
+// expose some models with aliases and others without. An id that matches
+// nothing is returned unchanged, so execution stays permissive rather than
+// rejecting a model the account may still be entitled to use.
+func ResolveUpstreamModel(candidate string, cred Credential) string {
+	trimmed := strings.TrimSpace(candidate)
+	if trimmed == "" {
+		return ""
+	}
+	for _, selected := range cred.Models {
+		name := strings.TrimSpace(selected.Name)
+		if name == "" {
+			continue
+		}
+		if alias := strings.TrimSpace(selected.Alias); alias != "" && alias == trimmed {
+			return name
+		}
+		if name == trimmed {
+			return trimmed
+		}
+	}
+	return trimmed
+}

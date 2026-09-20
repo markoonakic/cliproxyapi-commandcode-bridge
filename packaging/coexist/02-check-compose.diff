@@ -1,0 +1,13 @@
+--- a/hosts/sarmica/cliproxyapi/check-compose.py
++++ b/hosts/sarmica/cliproxyapi/check-compose.py
+@@ -36,8 +36,9 @@
+     ("bind", "/var/lib/cliproxyapi/auth", "/var/lib/cliproxyapi/auth", False),
+     ("bind", "/etc/cliproxyapi/static/management.html", "/etc/cliproxyapi/static/management.html", True),
+     ("bind", "/etc/cliproxyapi/plugins/commandcode-bridge.so", "/etc/cliproxyapi/plugins/commandcode-bridge.so", True),
++    ("bind", "/etc/cliproxyapi/plugins/command-code.so", "/etc/cliproxyapi/plugins/command-code.so", True),
+ }
+-assert len(service["volumes"]) == 4
++assert len(service["volumes"]) == 5
+ assert service["tmpfs"] == ["/tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777"]
+ assert service["networks"] == {"frontend": None}
+ assert set(model["networks"]) == {"frontend"}

@@ -1,0 +1,28 @@
+--- a/hosts/sarmica/cliproxyapi.nix
++++ b/hosts/sarmica/cliproxyapi.nix
+@@ -1,6 +1,9 @@
+ { config, pkgs, ... }:
+ let
+   bridge = pkgs.callPackage ../../packages/commandcode-bridge { };
++  # Second plugin for the side-by-side trial. Distinct provider key, credential
++  # file and .so name, so it coexists with the community plugin above.
++  commandCode = pkgs.callPackage ../../packages/command-code { };
+   composeFile = ./cliproxyapi/compose.yaml;
+   configFile = ./cliproxyapi/config.yaml;
+   secretsFile = ./cliproxyapi-secrets.sops.yaml;
+@@ -54,6 +57,7 @@
+   environment.etc = {
+     "cliproxyapi/static/management.html".source = managementPanel;
+     "cliproxyapi/plugins/commandcode-bridge.so".source = "${bridge}/lib/commandcode-bridge.so";
++    "cliproxyapi/plugins/command-code.so".source = "${commandCode}/lib/command-code.so";
+     "cliproxyapi/newt-blueprint.yaml".source = ./cliproxyapi/newt-blueprint.yaml;
+   };
+ 
+@@ -173,6 +177,7 @@
+       accessSecretsFile
+       managementPanel
+       bridge
++      commandCode
+       ./cliproxyapi/newt-blueprint.yaml
+     ];
+   };

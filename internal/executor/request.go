@@ -229,23 +229,7 @@ func resolveModel(executorModel, requested string, cred auth.Credential) string 
 	if candidate == "" {
 		candidate = strings.TrimSpace(requested)
 	}
-	if candidate == "" {
-		return ""
-	}
-	for _, selected := range cred.Models {
-		name := strings.TrimSpace(selected.Name)
-		alias := strings.TrimSpace(selected.Alias)
-		if name == "" {
-			continue
-		}
-		if alias != "" && alias == candidate {
-			return name
-		}
-		if name == candidate {
-			return candidate
-		}
-	}
-	return candidate
+	return auth.ResolveUpstreamModel(candidate, cred)
 }
 
 func textContent(raw json.RawMessage) (string, error) {

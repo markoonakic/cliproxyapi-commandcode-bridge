@@ -1,0 +1,10 @@
+--- a/hosts/sarmica/cliproxyapi/compose.yaml
++++ b/hosts/sarmica/cliproxyapi/compose.yaml
+@@ -26,6 +26,7 @@
+       - /var/lib/cliproxyapi/auth:/var/lib/cliproxyapi/auth
+       - /etc/cliproxyapi/static/management.html:/etc/cliproxyapi/static/management.html:ro
+       - /etc/cliproxyapi/plugins/commandcode-bridge.so:/etc/cliproxyapi/plugins/commandcode-bridge.so:ro
++      - /etc/cliproxyapi/plugins/command-code.so:/etc/cliproxyapi/plugins/command-code.so:ro
+     tmpfs:
+       - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+     networks: [frontend]

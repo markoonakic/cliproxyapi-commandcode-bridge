@@ -115,12 +115,8 @@ func (p *Provider) ModelsForAuth(ctx context.Context, req pluginapi.AuthModelReq
 		}
 		// An alias becomes the client-visible id; the upstream id is preserved
 		// in Name so the executor still addresses the right model.
-		id := name
-		if alias := strings.TrimSpace(selected.Alias); alias != "" {
-			id = alias
-		}
 		models = append(models, pluginapi.ModelInfo{
-			ID:                         id,
+			ID:                         auth.ClientModelID(selected),
 			Name:                       name,
 			DisplayName:                DisplayNameFor(name),
 			ContextLength:              contexts[name],

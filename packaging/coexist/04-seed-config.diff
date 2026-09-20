@@ -1,0 +1,17 @@
+--- a/hosts/sarmica/cliproxyapi/config.yaml
++++ b/hosts/sarmica/cliproxyapi/config.yaml
+@@ -23,7 +23,13 @@
+ discovery:
+   enabled: false
+ plugins:
+-  enabled: false
++  enabled: true
++  dir: /etc/cliproxyapi/plugins
++  configs:
++    commandcode-bridge:
++      enabled: true
++    command-code:
++      enabled: true
+ ws-auth: true
+ quota-exceeded:
+   switch-project: true
