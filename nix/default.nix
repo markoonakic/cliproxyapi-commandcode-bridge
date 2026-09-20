@@ -4,7 +4,7 @@
 }:
 buildGoModule (finalAttrs: {
   pname = "commandcode-bridge";
-  version = "1.0.0";
+  version = "1.1.0";
 
   # Built from the local source tree. The NixOS module passes the repository
   # checkout here; there is no upstream release to fetch.

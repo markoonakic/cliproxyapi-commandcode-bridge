@@ -16,6 +16,7 @@ import (
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/management"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/model"
 	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/quota"
+	"github.com/markoonakic/cliproxyapi-commandcode-bridge/internal/scheduler"
 )
 
 // runtime holds the capability implementations for the current run.
@@ -24,16 +25,21 @@ type runtime struct {
 	auth       *auth.Provider
 	models     *model.Provider
 	executor   *executor.Provider
+	scheduler  *scheduler.Provider
 	management *management.Provider
 }
 
 func newRuntime() *runtime {
 	quotaProvider := quota.NewProvider()
 	return &runtime{
-		quota:      quotaProvider,
-		auth:       auth.NewProvider(),
-		models:     model.NewProvider(),
-		executor:   executor.NewProvider(),
+		quota:    quotaProvider,
+		auth:     auth.NewProvider(),
+		models:   model.NewProvider(),
+		executor: executor.NewProvider(),
+		// The scheduler reads the quota provider's cached exhaustion state, so
+		// it skips an account whose window is used up before upstream has to
+		// reject the request.
+		scheduler:  scheduler.NewProvider(quotaProvider),
 		management: management.NewProvider(quotaProvider),
 	}
 }
@@ -160,6 +166,14 @@ func Dispatch(method string, raw []byte, version, commit string) ([]byte, error)
 			return abi.Fail(err), nil
 		}
 		return respond(state.executor.HttpRequest(host.WithCallbackID(context.Background(), callbackID), req))
+
+	// Scheduler capability.
+	case abi.MethodSchedulerPick:
+		req, err := decode[pluginapi.SchedulerPickRequest](raw)
+		if err != nil {
+			return abi.Fail(err), nil
+		}
+		return respond(state.scheduler.Pick(context.Background(), req))
 
 	// Management capability.
 	case abi.MethodManagementRegister:

@@ -38,6 +38,8 @@ func registration(version, _ string) ([]byte, error) {
 			"executor_model_scope":    "oauth",
 			"executor_input_formats":  []string{"chat-completions"},
 			"executor_output_formats": []string{"chat-completions"},
+			// Priority-aware, quota-aware multi-account selection.
+			"scheduler": true,
 			// Enrollment and quota dashboard under /v0/resource/plugins/.
 			"management_api": true,
 		},

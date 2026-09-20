@@ -258,3 +258,79 @@ func TestCacheSeparatesSuccessAndError(t *testing.T) {
 		t.Error("a failed entry must not be served as a value")
 	}
 }
+
+// TestExhaustionUntil verifies the scheduler's quota signal is derived from the
+// windows the host cannot see before upstream rejects a request.
+func TestExhaustionUntil(t *testing.T) {
+	now := time.UnixMilli(1789820000000).UTC()
+	future := now.Add(2 * time.Hour).UnixMilli()
+	past := now.Add(-2 * time.Hour).UnixMilli()
+
+	cases := []struct {
+		name    string
+		credits CreditsResponse
+		want    bool
+	}{
+		{"not exceeded", CreditsResponse{WindowLimits: WindowLimits{
+			FiveHour: &WindowLimit{Used: 1, Cap: 14, Exceeded: false, ResetAt: future},
+		}}, false},
+		{"five hour exceeded", CreditsResponse{WindowLimits: WindowLimits{
+			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: future},
+		}}, true},
+		{"weekly exceeded", CreditsResponse{WindowLimits: WindowLimits{
+			Weekly: &WindowLimit{Used: 35, Cap: 35, Exceeded: true, ResetAt: future},
+		}}, true},
+		{"exceeded but already reset", CreditsResponse{WindowLimits: WindowLimits{
+			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: past},
+		}}, false},
+		{"exceeded without a reset time", CreditsResponse{WindowLimits: WindowLimits{
+			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: 0},
+		}}, false},
+		{"explicitly not limited", CreditsResponse{WindowLimits: WindowLimits{
+			Exceeded: boolPtr(false),
+			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: future},
+		}}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := exhaustionUntil(tc.credits, now)
+			if tc.want && got.IsZero() {
+				t.Error("expected an exhaustion time")
+			}
+			if !tc.want && !got.IsZero() {
+				t.Errorf("expected no exhaustion, got %v", got)
+			}
+		})
+	}
+}
+
+// TestCacheTracksExhaustionPerCredential verifies the scheduler reads per-account
+// state and that a passed reset window clears itself with no network call.
+func TestCacheTracksExhaustionPerCredential(t *testing.T) {
+	cache := NewCache()
+	if cache.Exhausted("a") {
+		t.Error("unknown credential must not be reported as exhausted")
+	}
+
+	cache.SetExhausted("a", time.Now().Add(time.Hour))
+	if !cache.Exhausted("a") {
+		t.Error("expected a to be exhausted")
+	}
+	if cache.Exhausted("b") {
+		t.Error("exhaustion must be per credential, not global")
+	}
+
+	// A window that has already reset clears itself.
+	cache.SetExhausted("c", time.Now().Add(-time.Minute))
+	if cache.Exhausted("c") {
+		t.Error("an elapsed reset must clear exhaustion")
+	}
+
+	// A zero reset clears the mark rather than blocking forever.
+	cache.SetExhausted("a", time.Time{})
+	if cache.Exhausted("a") {
+		t.Error("a zero reset must clear exhaustion")
+	}
+}
+
+func boolPtr(v bool) *bool { return &v }

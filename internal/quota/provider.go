@@ -101,7 +101,46 @@ func (p *Provider) FetchQuota(ctx context.Context, req pluginapi.QuotaFetchReque
 		return pluginapi.QuotaFetchResponse{}, errMap
 	}
 	p.cache.Put(key, resp)
+	// Record exhaustion so the scheduler can skip this account until reset.
+	p.cache.SetExhausted(req.AuthID, exhaustionUntil(credits, time.Now()))
 	return resp, nil
+}
+
+// exhaustionUntil returns the earliest reset time among windows that are used
+// up, or the zero time when the account still has quota.
+//
+// The host learns about exhaustion only after upstream returns a rate-limit
+// error; recording it here lets the scheduler avoid the account proactively.
+func exhaustionUntil(credits CreditsResponse, now time.Time) time.Time {
+	if credits.WindowLimits.Exceeded != nil && !*credits.WindowLimits.Exceeded {
+		return time.Time{}
+	}
+	var earliest time.Time
+	for _, window := range []*WindowLimit{credits.WindowLimits.FiveHour, credits.WindowLimits.Weekly} {
+		if window == nil || !window.Exceeded {
+			continue
+		}
+		reset := time.UnixMilli(window.ResetAt).UTC()
+		if window.ResetAt <= 0 || reset.Year() < 2000 || reset.Year() > 2200 {
+			continue
+		}
+		if reset.Before(now) {
+			continue
+		}
+		if earliest.IsZero() || reset.Before(earliest) {
+			earliest = reset
+		}
+	}
+	return earliest
+}
+
+// Exhausted reports whether the credential's cached quota is used up.
+// It satisfies the scheduler's availability contract.
+func (p *Provider) Exhausted(authID string) bool {
+	if p == nil {
+		return false
+	}
+	return p.cache.Exhausted(authID)
 }
 
 // ResetQuota always reports failure. Returning success would make the host
@@ -228,10 +267,14 @@ func parseCredential(raw []byte) (credential, error) {
 }
 
 // Cache is a small keyed cache with separate success and error TTLs.
+//
+// It also tracks per-credential exhaustion so the scheduler can skip an account
+// whose quota window is used up before upstream has to reject a request.
 type Cache struct {
-	mu      sync.Mutex
-	entries map[string]cacheEntry
-	now     func() time.Time
+	mu        sync.Mutex
+	entries   map[string]cacheEntry
+	exhausted map[string]time.Time
+	now       func() time.Time
 }
 
 type cacheEntry struct {
@@ -242,7 +285,48 @@ type cacheEntry struct {
 
 // NewCache builds an empty cache.
 func NewCache() *Cache {
-	return &Cache{entries: make(map[string]cacheEntry), now: time.Now}
+	return &Cache{
+		entries:   make(map[string]cacheEntry),
+		exhausted: make(map[string]time.Time),
+		now:       time.Now,
+	}
+}
+
+// SetExhausted records that a credential's quota is used up until the given
+// reset time. A zero reset time clears the mark, because the window has no
+// known reset and the account must not stay blocked forever.
+func (c *Cache) SetExhausted(authID string, until time.Time) {
+	if c == nil || authID == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if until.IsZero() || c.now().After(until) {
+		delete(c.exhausted, authID)
+		return
+	}
+	c.exhausted[authID] = until
+}
+
+// Exhausted reports whether the credential's quota is currently used up.
+// An unknown credential is not exhausted, so missing data never blocks a pick.
+func (c *Cache) Exhausted(authID string) bool {
+	if c == nil || authID == "" {
+		return false
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	until, ok := c.exhausted[authID]
+	if !ok {
+		return false
+	}
+	if c.now().After(until) {
+		// The window has reset, so the account is eligible again with no
+		// network call and no background timer.
+		delete(c.exhausted, authID)
+		return false
+	}
+	return true
 }
 
 // Get returns a cached success value if it is still fresh.
