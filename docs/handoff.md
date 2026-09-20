@@ -1,6 +1,6 @@
 # Handoff: switchover procedure
 
-Status: plugin source complete (phases 1–3, plus packaging). Not yet deployed.
+Status: plugin source complete (all planned phases, including the scheduler). Not yet deployed.
 
 ## What is done
 
