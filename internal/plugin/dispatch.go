@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 
@@ -150,7 +151,14 @@ func Dispatch(method string, raw []byte, version, commit string) ([]byte, error)
 			return abi.Fail(err), nil
 		}
 		ctx := host.WithCallbackID(host.WithStreamID(context.Background(), envelope.StreamID), envelope.HostCallbackID)
-		return respond(state.executor.ExecuteStream(ctx, req))
+		streamResp, errStream := state.executor.ExecuteStream(ctx, req)
+		if errStream != nil {
+			return abi.Fail(errStream), nil
+		}
+		// Only headers cross the ABI. The SDK stream response also carries a
+		// channel of chunks, which cannot be JSON-encoded; chunks are delivered
+		// asynchronously through host.stream.emit instead.
+		return abi.OK(executorStreamWire{Headers: streamResp.Headers})
 	case abi.MethodExecutorCountTokens:
 		req, callbackID, err := decodeWithCallback[pluginapi.ExecutorRequest](raw)
 		if err != nil {
@@ -197,6 +205,13 @@ func Dispatch(method string, raw []byte, version, commit string) ([]byte, error)
 	default:
 		return abi.Fail(abi.NewError("unknown_method", fmt.Sprintf("unknown method: %s", method), 400)), nil
 	}
+}
+
+// executorStreamWire is the JSON shape returned for executor.execute_stream.
+// The SDK type carries a chunk channel, which the host cannot decode, so the
+// response is reduced to headers; chunks arrive through host.stream.emit.
+type executorStreamWire struct {
+	Headers http.Header `json:"headers,omitempty"`
 }
 
 // managementRouteWire is one management route on the wire. Handlers are

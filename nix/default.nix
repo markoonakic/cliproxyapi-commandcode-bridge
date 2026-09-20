@@ -4,7 +4,7 @@
 }:
 buildGoModule (finalAttrs: {
   pname = "cliproxyapi-command-code";
-  version = "1.2.2";
+  version = "1.2.3";
 
   # Built from the local source tree. The NixOS module passes the repository
   # checkout here; there is no upstream release to fetch.
