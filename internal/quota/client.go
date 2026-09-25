@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginabi"
@@ -90,10 +91,21 @@ type Credits struct {
 
 // WindowLimits groups the metered windows.
 type WindowLimits struct {
-	Limited  bool         `json:"limited"`
-	Exceeded *bool        `json:"exceeded"`
-	FiveHour *WindowLimit `json:"fiveHour"`
-	Weekly   *WindowLimit `json:"weekly"`
+	Limited bool `json:"limited"`
+	// Exceeded is not always a boolean. Upstream has sent it as null, as a
+	// boolean, and as the name of the exceeded window ("weekly"). Decoding it
+	// strictly as a bool made every quota read fail as soon as one window was
+	// exceeded, so the raw value is kept and only an explicit false is read.
+	Exceeded json.RawMessage `json:"exceeded"`
+	FiveHour *WindowLimit    `json:"fiveHour"`
+	Weekly   *WindowLimit    `json:"weekly"`
+}
+
+// ExceededIsFalse reports an explicit `false`, the only value that proves no
+// window is exceeded. Null, true, and a window name all leave the per-window
+// flags as the source of truth, because they name the window themselves.
+func (w WindowLimits) ExceededIsFalse() bool {
+	return strings.TrimSpace(string(w.Exceeded)) == "false"
 }
 
 // CreditsResponse is the /alpha/billing/credits payload.

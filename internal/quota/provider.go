@@ -113,7 +113,7 @@ func (p *Provider) FetchQuota(ctx context.Context, req pluginapi.QuotaFetchReque
 // The host learns about exhaustion only after upstream returns a rate-limit
 // error; recording it here lets the scheduler avoid the account proactively.
 func exhaustionUntil(credits CreditsResponse, now time.Time) time.Time {
-	if credits.WindowLimits.Exceeded != nil && !*credits.WindowLimits.Exceeded {
+	if credits.WindowLimits.ExceededIsFalse() {
 		return time.Time{}
 	}
 	var earliest time.Time

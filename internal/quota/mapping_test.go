@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +34,26 @@ const liveCredits = `{
     "exceeded": null,
     "fiveHour": {"used": 1.69041425, "cap": 14, "exceeded": false, "resetAt": 1789821304634},
     "weekly": {"used": 7.525831474, "cap": 35, "exceeded": false, "resetAt": 1790328928004}
+  }
+}`
+
+// liveExceededCredits is the payload captured from a live Command Code account
+// while its weekly window was exceeded. Upstream changed windowLimits.exceeded
+// from null to the name of the exceeded window, which a strict bool could not
+// decode, so this fixture pins the shape that broke every quota read.
+const liveExceededCredits = `{
+  "credits": {
+    "belowThreshold": false,
+    "creditThreshold": 0,
+    "monthlyCredits": 34.9994455693,
+    "purchasedCredits": 0,
+    "freeCredits": 0
+  },
+  "windowLimits": {
+    "limited": true,
+    "exceeded": "weekly",
+    "fiveHour": {"used": 0.691363631, "cap": 14, "exceeded": false, "resetAt": 1790203351870},
+    "weekly": {"used": 35.0005544307, "cap": 35, "exceeded": true, "resetAt": 1790328928004}
   }
 }`
 
@@ -102,6 +123,64 @@ func TestMapQuotaLivePayload(t *testing.T) {
 	}
 	if math.Abs(metric.Value-62.474168526) > 1e-9 {
 		t.Errorf("credits value = %v, want 62.474168526", metric.Value)
+	}
+}
+
+// TestExceededFieldAcceptsEveryUpstreamShape pins the field that broke quota
+// reads: null, a boolean, and the name of the exceeded window must all decode.
+func TestExceededFieldAcceptsEveryUpstreamShape(t *testing.T) {
+	cases := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{"null", `{"windowLimits":{"exceeded":null}}`, false},
+		{"absent", `{"windowLimits":{}}`, false},
+		{"false", `{"windowLimits":{"exceeded":false}}`, true},
+		{"true", `{"windowLimits":{"exceeded":true}}`, false},
+		{"window name", `{"windowLimits":{"exceeded":"weekly"}}`, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var payload struct {
+				WindowLimits WindowLimits `json:"windowLimits"`
+			}
+			if err := jsonUnmarshal(tc.raw, &payload); err != nil {
+				t.Fatalf("decode %s: %v", tc.raw, err)
+			}
+			if got := payload.WindowLimits.ExceededIsFalse(); got != tc.want {
+				t.Errorf("ExceededIsFalse() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestMapQuotaLiveExceededPayload verifies the exceeded payload still produces
+// both bars, with the exceeded window clamped to zero remaining.
+func TestMapQuotaLiveExceededPayload(t *testing.T) {
+	var credits CreditsResponse
+	if err := jsonUnmarshal(liveExceededCredits, &credits); err != nil {
+		t.Fatalf("decode exceeded fixture: %v", err)
+	}
+	resp, err := MapQuota(credits, Subscription{PlanID: "individual-goat"}, nil, time.Now())
+	if err != nil {
+		t.Fatalf("MapQuota returned error: %v", err)
+	}
+	if len(resp.Groups) != 1 || len(resp.Groups[0].Buckets) != 2 {
+		t.Fatalf("groups = %+v, want one group with two buckets", resp.Groups)
+	}
+	byWindow := map[string]pluginapi.QuotaBucket{}
+	for _, bucket := range resp.Groups[0].Buckets {
+		byWindow[bucket.Window] = bucket
+	}
+	if got := byWindow["weekly"].RemainingFraction; got != 0 {
+		t.Errorf("weekly remainingFraction = %v, want 0 (usage over the cap is clamped)", got)
+	}
+	if got := byWindow["5h"].RemainingFraction; math.Abs(got-0.9506169) > 1e-6 {
+		t.Errorf("5h remainingFraction = %v, want 0.9506169", got)
+	}
+	if !strings.Contains(byWindow["weekly"].Description, "exceeded") {
+		t.Errorf("weekly description = %q, want it marked exceeded", byWindow["weekly"].Description)
 	}
 }
 
@@ -287,9 +366,13 @@ func TestExhaustionUntil(t *testing.T) {
 			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: 0},
 		}}, false},
 		{"explicitly not limited", CreditsResponse{WindowLimits: WindowLimits{
-			Exceeded: boolPtr(false),
+			Exceeded: json.RawMessage("false"),
 			FiveHour: &WindowLimit{Used: 14, Cap: 14, Exceeded: true, ResetAt: future},
 		}}, false},
+		{"weekly named by the exceeded field", CreditsResponse{WindowLimits: WindowLimits{
+			Exceeded: json.RawMessage(`"weekly"`),
+			Weekly:   &WindowLimit{Used: 35, Cap: 35, Exceeded: true, ResetAt: future},
+		}}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -332,5 +415,3 @@ func TestCacheTracksExhaustionPerCredential(t *testing.T) {
 		t.Error("a zero reset must clear exhaustion")
 	}
 }
-
-func boolPtr(v bool) *bool { return &v }
